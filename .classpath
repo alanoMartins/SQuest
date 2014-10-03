@@ -7,6 +7,7 @@
 	<classpathentry kind="lib" path="libs/ffmpeg.jar"/>
 	<classpathentry kind="lib" path="libs/javacv.jar"/>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="res"/>
 	<classpathentry kind="src" path="gen"/>
 	<classpathentry kind="output" path="bin/classes"/>
 </classpath>

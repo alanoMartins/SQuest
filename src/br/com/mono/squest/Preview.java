@@ -5,6 +5,7 @@ import java.util.List;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Canvas;
 import android.graphics.ImageFormat;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
@@ -15,6 +16,8 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 public class Preview extends SurfaceView implements SurfaceHolder.Callback {
+	private static final String LOG_NAME = "OPENCV";
+	
 	SurfaceHolder surfaceHolder;
 	Camera camera;
 	Camera.PreviewCallback previewCallback;
@@ -35,6 +38,7 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 
 	public void surfaceCreated(SurfaceHolder holder) {
 		camera = Camera.open(0);
+		setWillNotDraw(false);
 		try {
 			camera.setPreviewDisplay(holder);
 			setCameraDisplayOrientation((Activity) context,
@@ -99,9 +103,9 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 
 		List<Size> sizes = parameters.getSupportedPreviewSizes();
 		Size optimalSize = getOptimalPreviewSize(sizes, width, height);
-		parameters.setPreviewSize(optimalSize.width, optimalSize.height);
+		parameters.setPreviewSize(width, height);
 		
-		camera.setParameters(parameters);
+		//camera.setParameters(parameters);
 		if (previewCallback != null) {
 			camera.setPreviewCallbackWithBuffer(previewCallback);
 			Camera.Size size = parameters.getPreviewSize();
@@ -145,5 +149,11 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 			result = (info.orientation - degrees + 360) % 360;
 		}
 		camera.setDisplayOrientation(result);
+	}
+	
+	@Override
+	protected void onDraw(Canvas canvas) {
+
+	    Log.w(LOG_NAME, "On Draw Called SURF");
 	}
 }
