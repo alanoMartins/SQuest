@@ -1,40 +1,34 @@
 package br.com.mono.squest;
 
+import static org.bytedeco.javacpp.helper.opencv_core.*;
 import static org.bytedeco.javacpp.opencv_core.*;
 import static org.bytedeco.javacpp.opencv_highgui.*;
 import static org.bytedeco.javacpp.opencv_imgproc.*;
 import static org.bytedeco.javacpp.opencv_video.*;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.FloatPointer;
+import org.bytedeco.javacpp.IntPointer;
+import org.bytedeco.javacpp.helper.opencv_core.*;
+
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.ImageFormat;
 import android.graphics.Paint;
-import android.graphics.Rect;
-import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.os.Environment;
 import android.util.Log;
 import android.view.View;
 
-import org.bytedeco.javacpp.opencv_core.IplImage;
-import org.bytedeco.javacpp.opencv_video.DenseOpticalFlow;
-
 public class OpenCvView extends View implements Camera.PreviewCallback {
 	private static final String LOG_NAME = "OPENCV";
 	public static final int SUBSAMPLING_FACTOR = 4;
 
-	private IplImage grayImage;
 	private Bitmap bitmap;
 
 	private int width = 0;
@@ -45,12 +39,10 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 
 	List<Point2d> pointsToDraw;
 
-	private CvMat opticalFlow;
-	private Mat cOpticalFlow;
-
 	private Paint mPaint;
 
-	private Camera camera;
+
+	private static final int MAX_CORNERS = 500;
 
 	public OpenCvView(Context context) throws IOException {
 		super(context);
@@ -58,108 +50,31 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 
 	@Override
 	public void onPreviewFrame(byte[] data, Camera camera) {
-		this.camera = camera;
 		pointsToDraw = new ArrayList<Point2d>();
 
-		Log.e(LOG_NAME, "ON CALLBACK GETPARAMETER"
+		Log.d(LOG_NAME, "ON CALLBACK GETPARAMETER"
 				+ camera.getParameters().getPreviewFormat());
 
 		try {
 			init(camera);
 			Log.i(LOG_NAME, "On Preview");
-			fillBitmap(data);
-			// fillOf(data);
+			// fillBitmap(data);
 			saveImage(data);
-			//processImage(data);
-			saveImageNative(data);
+			// processImage(data);
 			camera.addCallbackBuffer(data);
-			//this.invalidate();
 		} catch (RuntimeException e) {
 			e.printStackTrace();
 		}
 
 	}
 
-	private void fillOf(byte[] data) {
-
-		Log.i(LOG_NAME, "FILL OPT FLOW");
-		IplImage image = getIplImageFromData(data);
-
-		Log.i(LOG_NAME, "FILL OPT FLOW 1");
-
-		cImage = image;
-		if (pImage != null) {
-			pImage = image;
-		}
-
-		Log.i(LOG_NAME, "FILL OPT FLOW 2");
-		opticalFlow = cImage.asCvMat();
-
-		pImage = cImage;
-
-	}
-
-	private void fillBitmap(byte[] data) {
-		IplImage image = getIplImageFromData(data);
+	private void fillBitmap(IplImage image) {
 		bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 		bitmap.copyPixelsFromBuffer(image.getByteBuffer());
 	}
-
-	private void processImage(byte[] data) {
-
-		Log.i(LOG_NAME, "Save IPLIMAGE GRAY");
-		// Criando uma sub-amostragem e convertendo em escala de cinza.
-		int f = SUBSAMPLING_FACTOR;
-		if (grayImage == null || grayImage.width() != width / f
-				|| grayImage.height() != height / f) {
-			grayImage = IplImage.create(width / f, height / f, IPL_DEPTH_8U, 1);
-		}
-		int imageWidth = grayImage.width();
-		int imageHeight = grayImage.height();
-		int dataStride = f * width;
-		int imageStride = grayImage.widthStep();
-
-		// Deve ser igual ao grayImage.widthStep()
-		int widthResult = imageWidth * 1;
-
-		Log.i(LOG_NAME, "widthResult: " + widthResult);
-		Log.i(LOG_NAME, "imageStride: " + imageStride);
-
-		ByteBuffer imageBuffer = grayImage.getByteBuffer();
-
-		for (int y = 0; y < imageHeight; y++) {
-			int dataLine = y * dataStride;
-			int imageLine = y * imageStride;
-			for (int x = 0; x < imageWidth; x++) {
-				imageBuffer.put(imageLine + x, data[dataLine + f * x]);
-			}
-		}
-
-		bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-		bitmap.copyPixelsFromBuffer(grayImage.getByteBuffer());
-
-		File file = new File(Environment.getExternalStorageDirectory(),
-				"imageOpenGRAYCv.png");
-		cvSaveImage(file.getAbsolutePath(), grayImage);
-
-		postInvalidate();
-		this.refreshDrawableState();
-
-	}
-
+ 
 	private void saveImage(byte[] data) {
 
-		// Log.i(LOG_NAME, "Save IPLIMAGE");
-		Camera.Parameters paramCam = camera.getParameters();
-		// Log.d(LOG_NAME, width + "w");
-		// Log.d(LOG_NAME, height + "h");
-
-		// Log.d(LOG_NAME, paramCam.getPreviewFormat() + "p");
-
-		// Log.d(LOG_NAME,
-		// ImageFormat.getBitsPerPixel(paramCam.getPreviewFormat()) + "h");
-
-		// Log.d(LOG_NAME, data.length + "d");
 		IplImage image = getIplImageFromData(data);
 
 		cImage = image;
@@ -167,68 +82,29 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 		if (pImage == null) {
 			pImage = image;
 		}
-
-		pointsToDraw = calcPoints(new Mat(cImage));
-		// cOpticalFlow = new Mat(cImage);
-		IplImage opflw =  TestOF(pImage, cImage).asIplImage();
-
-		File file = new File(Environment.getExternalStorageDirectory(),
-				"imageOpenCv.jpg");
+		IplImage result = null;
+		Log.i(LOG_NAME, "INI Convert");
+		try {
+			result = TestLK(cImage, pImage);
+			fillBitmap(result);
+		} catch (Exception e) {
+			Log.e(LOG_NAME, e.getMessage());
+		}
 
 		File file1 = new File(Environment.getExternalStorageDirectory(),
 				"imageOpen2SaveCv.jpg");
 
-		// IplImage yuvimage = IplImage.create(width, height, IPL_DEPTH_8U, 2);
-		// yuvimage.getByteBuffer().put(data);
-		//
-		// IplImage bgrimage = IplImage.create(width, height, IPL_DEPTH_8U, 3);
-		// cvCvtColor(image, bgrimage, CV_YUV2BGR_NV21);
-
-		FileOutputStream out;
-
 		try {
-			cvSaveImage(file1.getAbsolutePath(), opflw);
-			out = new FileOutputStream(file);
-			IplToBitmap(image, bitmap);
-			bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
-			out.flush();
-			out.close();
+			// Log.i(LOG_NAME, "INI SAVE");
+			cvSaveImage(file1.getAbsolutePath(), result);
+			// Log.i(LOG_NAME, "END SAVE");
 		} catch (Exception e) {
 			Log.e(LOG_NAME, e.getMessage());
 		}
-		pImage = image;
-
-	}
-
-	private void saveImageNative(byte[] data) {
-
-		Log.i(LOG_NAME, "Save Native");
-		FileOutputStream out;
-
-		Camera.Parameters paramCam = camera.getParameters();
-		Log.d(LOG_NAME, width + "w");
-		Log.d(LOG_NAME, height + "h");
-		Log.d(LOG_NAME,
-				ImageFormat.getBitsPerPixel(paramCam.getPreviewFormat()) + "h");
-
-		Log.d(LOG_NAME, data.length + "d");
-
-		Rect rect = new Rect(0, 0, width, height);
-
-		File file = new File(Environment.getExternalStorageDirectory(),
-				"imageNative.jpg");
-
-		try {
-			// cvSaveImage(file.getAbsolutePath(), bgrimage);
-			out = new FileOutputStream(file);
-			YuvImage yuvimage = new YuvImage(data, paramCam.getPreviewFormat(),
-					width, height, null);
-			yuvimage.compressToJpeg(rect, 100, out);
-			out.flush();
-			out.close();
-		} catch (Exception e) {
-			Log.e(LOG_NAME, e.getMessage());
-		}
+		pImage = cImage;
+		
+		postInvalidate();
+		this.refreshDrawableState();
 
 	}
 
@@ -298,47 +174,100 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 		}
 	}
 
-	public CvMat TestOF(IplImage pFrame, IplImage cFrame) {
+	public IplImage TestLK(IplImage pImg, IplImage cImg) {
 
-		Log.i(LOG_NAME, "Do optical flow");
+		IplImage imgA = cvCreateImage(cvGetSize(pImage), IPL_DEPTH_8U, 1);
+		IplImage imgB = cvCreateImage(cvGetSize(pImage), IPL_DEPTH_8U, 1);
+		IplImage imgC = pImg.clone();
 
-		IplImage pGray = pFrame;
-		Mat mat1 = new Mat(pGray.asCvMat());
-		IplImage cGray = cFrame;
-		Mat mat2 = new Mat(cGray.asCvMat());
-		cvConvertImage(pFrame, pGray, IPL_DEPTH_32F);
-		cvConvertImage(cFrame, cGray, IPL_DEPTH_32F);
-		IplImage Optical_Flow = IplImage
-				.create(width, height, IPL_DEPTH_32F, 2);
-		Mat mat3 = new Mat(Optical_Flow.asCvMat());
+		cvCvtColor(pImg, imgA, CV_BGR2GRAY);
+		cvCvtColor(cImg, imgB, CV_BGR2GRAY);
 
-		DenseOpticalFlow tvl1 = createOptFlow_DualTVL1();
-		tvl1.calc(mat1, mat2, mat3);
-		Optical_Flow = mat3.asIplImage();
-		FloatBuffer buffer = Optical_Flow.getFloatBuffer();
-		CvMat OF = cvCreateMat(pGray.height(), pGray.width(), CV_32F);
-		int pixelVelocity = 0;
-		int xVelocity = 0;
-		int yVelocity = 0;
-		int bufferIndex = 0;
-		for (int y = 0; y < pGray.height(); y++) {
-			for (int x = 0; x < pGray.width(); x++) {
-				xVelocity = (int) buffer.get(bufferIndex);
-				yVelocity = (int) buffer.get(bufferIndex + 1);
-				pixelVelocity = (int) Math
-						.sqrt((double) (xVelocity * xVelocity + yVelocity
-								* yVelocity));
-				OF.put(y, x, pixelVelocity);
-			}
+		IplImage eig_image = cvCreateImage(cvGetSize(pImage), IPL_DEPTH_8U, 1);
+		IplImage tmp_image = cvCreateImage(cvGetSize(pImage), IPL_DEPTH_8U, 1);
+
+		IntPointer corner_count = new IntPointer(1).put(MAX_CORNERS);
+		CvPoint2D32f cornersA = new CvPoint2D32f(MAX_CORNERS);
+		double quality_level = 0.1; // OR 0.01
+		double min_distance = 5;
+
+		cvGoodFeaturesToTrack(imgA, eig_image, tmp_image, cornersA,
+				corner_count, quality_level, min_distance);
+
+		cvFindCornerSubPix(imgA, cornersA, MAX_CORNERS, cvSize(3, 3),
+				cvSize(-1, -1),
+				cvTermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.1));
+
+		// Call Lucas Kanade algorithm
+		byte[] features_found = new byte[MAX_CORNERS];
+		float[] feature_errors = new float[MAX_CORNERS];
+
+		CvSize pyr_sz = cvSize(imgA.width() + 8, imgB.height() / 3);
+
+		IplImage pyrA = cvCreateImage(pyr_sz, IPL_DEPTH_8U, 1);
+		IplImage pyrB = cvCreateImage(pyr_sz, IPL_DEPTH_8U, 1);
+
+		CvPoint2D32f cornersB = new CvPoint2D32f(MAX_CORNERS);
+
+		BytePointer bPointer = new BytePointer(features_found);
+		FloatPointer fPointer = new FloatPointer(feature_errors);
+
+		cvCalcOpticalFlowPyrLK(imgA, imgB, pyrA, pyrB, cornersA, cornersB,
+				MAX_CORNERS, cvSize(5, 5), 2, bPointer, fPointer,
+				cvTermCriteria(CV_TERMCRIT_ITER | CV_TERMCRIT_EPS, 20, 0.3), 0);
+
+		List<Float> posPoints = new ArrayList<Float>();
+		List<Float> negPoints = new ArrayList<Float>();
+
+		// Make an image of the results
+		for (int i = 0; i < corner_count.sizeof(); i++) {
+			// if (features_found[i] == 0 || feature_errors[i] > 550) {
+			// System.out.println("Error is " + feature_errors[i] + "/n");
+			// continue;
+			// }
+			System.out.println("Got it/n");
+			cornersA.position(i);
+			cornersB.position(i);
+
+			float diff = cornersA.x() - cornersB.x();
+
+			if (diff > 0)
+				posPoints.add(cornersA.x() - cornersB.x());
+			else
+				negPoints.add(cornersA.x() - cornersB.x());
+
+			Log.i(LOG_NAME, "Xa: " + cornersA.x() + " Ya: " + cornersA.y());
+			Log.i(LOG_NAME, "Xb: " + cornersB.x() + " Yb: " + cornersB.y());
+
+			CvPoint p0 = cvPoint(Math.round(cornersA.x()),
+					Math.round(cornersA.y()));
+			CvPoint p1 = cvPoint(Math.round(cornersB.x()),
+					Math.round(cornersB.y()));
+			cvLine(imgC, p0, p1, CV_RGB(255, 0, 0), 2, 8, 0);
 		}
-		// IplImage temp = OF.asIplImage();
+		
+		if(posPoints.size() > negPoints.size())
+			Log.i(LOG_NAME, "DESLOCOU PRA DIREITA");
+		else
+			Log.i(LOG_NAME, "DESLOCOU PRA ESQUERDA");
 
-		return OF;
+		File fileA = new File(Environment.getExternalStorageDirectory(),
+				"imageA.jpg");
+		File fileB = new File(Environment.getExternalStorageDirectory(),
+				"imageB.jpg");
+		File fileRes = new File(Environment.getExternalStorageDirectory(),
+				"imageOFLK.jpg");
 
-		// File file = new File(Environment.getExternalStorageDirectory(),
-		// "opticalFlowResult.jpg");
-		//
-		// cvSaveImage(file.getAbsolutePath(), temp);
+		// Log.i(LOG_NAME, "CORNER A: " + cornersA.sizeof());
+		// Log.i(LOG_NAME, "Corner B: " + cornersB.sizeof());
+
+		// Log.i(LOG_NAME, "Save Test INI");
+		cvSaveImage(fileA.getAbsolutePath(), imgA);
+		cvSaveImage(fileB.getAbsolutePath(), imgB);
+		cvSaveImage(fileRes.getAbsolutePath(), imgC);
+		// Log.i(LOG_NAME, "Save Test END");
+
+		return imgC;
 	}
 
 	@Override
@@ -373,22 +302,6 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 		// }
 		// }
 		Log.i(LOG_NAME, "ONDRAW END");
-	}
-
-	private List<Point2d> calcPoints(Mat matResult) {
-
-		List<Point2d> points = new ArrayList<Point2d>();
-
-		for (int row = 0; row < matResult.rows(); row++) {
-
-			for (int col = 0; col < matResult.cols(); col++) {
-
-				Mat mat = matResult.row(row).col(col);
-				points.add(new Point2d(mat.getFloatBuffer()));
-
-			}
-		}
-		return points;
 	}
 
 	private Paint getPaint() {
