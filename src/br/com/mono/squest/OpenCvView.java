@@ -14,7 +14,10 @@ import java.util.List;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.FloatPointer;
 import org.bytedeco.javacpp.IntPointer;
-import org.bytedeco.javacpp.helper.opencv_core.*;
+import org.bytedeco.javacpp.avcodec;
+import org.bytedeco.javacpp.avformat.av_format_control_message;
+import org.bytedeco.javacpp.avutil;
+import org.bytedeco.javacv.FFmpegFrameRecorder;
 
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -23,6 +26,7 @@ import android.graphics.Paint;
 import android.hardware.Camera;
 import android.os.Environment;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 
 public class OpenCvView extends View implements Camera.PreviewCallback {
@@ -37,30 +41,53 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 	private IplImage pImage;
 	private IplImage cImage;
 
-	List<Point2d> pointsToDraw;
-
 	private Paint mPaint;
-
+	private FFmpegFrameRecorder recorder;
 
 	private static final int MAX_CORNERS = 500;
 
 	public OpenCvView(Context context) throws IOException {
 		super(context);
+		File video = new File(Environment.getExternalStorageDirectory(),
+				"openMP4.mp4");
+		recorder = new FFmpegFrameRecorder(video, 600, 400, 1);
+		recorder.setVideoCodec(avcodec.AV_CODEC_ID_MPEG4);
+        recorder.setFormat("mp4");
+        //recorder.setPixelFormat(avutil.PIX_FMT_YUV420P16);
+        recorder.setFrameRate(30);
+		try {
+			Log.e(LOG_NAME, "CODEC RECORD: " + recorder.getVideoCodec());
+			Log.e(LOG_NAME, "INITIALIZE RECORD");
+			recorder.start();
+		} catch (org.bytedeco.javacv.FrameRecorder.Exception e) {
+			Log.e(LOG_NAME, e.getMessage());
+		}
+	}
+
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+
+		if (keyCode == KeyEvent.KEYCODE_BACK) {
+			try {
+				Log.e(LOG_NAME, "STOP RECORD");
+				recorder.stop();
+				recorder.release();
+			} catch (org.bytedeco.javacv.FrameRecorder.Exception e) {
+				Log.e(LOG_NAME, e.getMessage());
+			}
+
+			return true;
+		}
+
+		return super.onKeyDown(keyCode, event);
 	}
 
 	@Override
 	public void onPreviewFrame(byte[] data, Camera camera) {
-		pointsToDraw = new ArrayList<Point2d>();
-
-		Log.d(LOG_NAME, "ON CALLBACK GETPARAMETER"
-				+ camera.getParameters().getPreviewFormat());
 
 		try {
 			init(camera);
-			Log.i(LOG_NAME, "On Preview");
-			// fillBitmap(data);
 			saveImage(data);
-			// processImage(data);
 			camera.addCallbackBuffer(data);
 		} catch (RuntimeException e) {
 			e.printStackTrace();
@@ -72,7 +99,7 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 		bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 		bitmap.copyPixelsFromBuffer(image.getByteBuffer());
 	}
- 
+
 	private void saveImage(byte[] data) {
 
 		IplImage image = getIplImageFromData(data);
@@ -86,6 +113,10 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 		Log.i(LOG_NAME, "INI Convert");
 		try {
 			result = TestLK(cImage, pImage);
+			
+			IplImage bgrimage = IplImage.create(cvGetSize(result), IPL_DEPTH_8U, 4);
+			//cvCvtColor(result, bgrimage, CV_YUV420sp2BGR);
+			recorder.record(result);
 			fillBitmap(result);
 		} catch (Exception e) {
 			Log.e(LOG_NAME, e.getMessage());
@@ -95,14 +126,13 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 				"imageOpen2SaveCv.jpg");
 
 		try {
-			// Log.i(LOG_NAME, "INI SAVE");
 			cvSaveImage(file1.getAbsolutePath(), result);
-			// Log.i(LOG_NAME, "END SAVE");
 		} catch (Exception e) {
 			Log.e(LOG_NAME, e.getMessage());
 		}
 		pImage = cImage;
-		
+
+		// Força a tela desenhar
 		postInvalidate();
 		this.refreshDrawableState();
 
@@ -245,8 +275,8 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 					Math.round(cornersB.y()));
 			cvLine(imgC, p0, p1, CV_RGB(255, 0, 0), 2, 8, 0);
 		}
-		
-		if(posPoints.size() > negPoints.size())
+
+		if (posPoints.size() > negPoints.size())
 			Log.i(LOG_NAME, "DESLOCOU PRA DIREITA");
 		else
 			Log.i(LOG_NAME, "DESLOCOU PRA ESQUERDA");
@@ -275,33 +305,11 @@ public class OpenCvView extends View implements Camera.PreviewCallback {
 		try {
 			Thread.sleep(100);
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		Log.i(LOG_NAME, "ONDRAW INI");
 
 		if (bitmap != null)
 			canvas.drawBitmap(bitmap, 0, 0, getPaint());
-
-		// if (pointsToDraw != null) {
-		// Log.i(LOG_NAME, "pointsToDraw: " + pointsToDraw.size());
-		//
-		//
-		// // CvMat flow = opticalFlow;
-		//
-		// if (pointsToDraw.size() > 0)
-		//
-		// for (int index = 0; index < pointsToDraw.size() / 1000; index++) {
-		// Point2d point = pointsToDraw.get(index);
-		//
-		// Log.i(LOG_NAME, "XXXXXX: " + point.x());
-		// Log.i(LOG_NAME, "YYYYYY: " + point.y());
-		//
-		// canvas.drawPoint((float) point.x(), (float) point.y(),
-		// getPaint());
-		// }
-		// }
-		Log.i(LOG_NAME, "ONDRAW END");
 	}
 
 	private Paint getPaint() {

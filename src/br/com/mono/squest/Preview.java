@@ -99,10 +99,6 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 		Camera.Parameters parameters = camera.getParameters();
 		parameters.getSupportedPreviewFormats();
 		
-		Log.i("OPENCV", "CAMERA PREVIEW FORMAT:" + String.valueOf(parameters.getPreviewFormat()));
-
-		List<Size> sizes = parameters.getSupportedPreviewSizes();
-		Size optimalSize = getOptimalPreviewSize(sizes, width, height);
 		parameters.setPreviewSize(width, height);
 		
 		//camera.setParameters(parameters);
