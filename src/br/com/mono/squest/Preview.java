@@ -5,6 +5,10 @@ import java.util.List;
 
 import android.app.Activity;
 import android.content.Context;
+<<<<<<< HEAD
+=======
+import android.graphics.Canvas;
+>>>>>>> FETCH_HEAD
 import android.graphics.ImageFormat;
 import android.hardware.Camera;
 import android.hardware.Camera.CameraInfo;
@@ -15,6 +19,11 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 public class Preview extends SurfaceView implements SurfaceHolder.Callback {
+<<<<<<< HEAD
+=======
+	private static final String LOG_NAME = "OPENCV";
+	
+>>>>>>> FETCH_HEAD
 	SurfaceHolder surfaceHolder;
 	Camera camera;
 	Camera.PreviewCallback previewCallback;
@@ -35,6 +44,10 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 
 	public void surfaceCreated(SurfaceHolder holder) {
 		camera = Camera.open(0);
+<<<<<<< HEAD
+=======
+		setWillNotDraw(false);
+>>>>>>> FETCH_HEAD
 		try {
 			camera.setPreviewDisplay(holder);
 			setCameraDisplayOrientation((Activity) context,
@@ -95,6 +108,7 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 		Camera.Parameters parameters = camera.getParameters();
 		parameters.getSupportedPreviewFormats();
 		
+<<<<<<< HEAD
 		Log.i("OPENCV", "CAMERA PREVIEW FORMAT:" + String.valueOf(parameters.getPreviewFormat()));
 
 		List<Size> sizes = parameters.getSupportedPreviewSizes();
@@ -102,6 +116,11 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 		parameters.setPreviewSize(optimalSize.width, optimalSize.height);
 		
 		camera.setParameters(parameters);
+=======
+		parameters.setPreviewSize(width, height);
+		
+		//camera.setParameters(parameters);
+>>>>>>> FETCH_HEAD
 		if (previewCallback != null) {
 			camera.setPreviewCallbackWithBuffer(previewCallback);
 			Camera.Size size = parameters.getPreviewSize();
@@ -146,4 +165,13 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 		}
 		camera.setDisplayOrientation(result);
 	}
+<<<<<<< HEAD
+=======
+	
+	@Override
+	protected void onDraw(Canvas canvas) {
+
+	    Log.w(LOG_NAME, "On Draw Called SURF");
+	}
+>>>>>>> FETCH_HEAD
 }

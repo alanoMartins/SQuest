@@ -20,7 +20,10 @@ public class MainActivity extends Activity{
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
 		super.onCreate(savedInstanceState);
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+<<<<<<< HEAD
 		
+=======
+>>>>>>> FETCH_HEAD
 		try {
 			layout = new FrameLayout(this);
 			openCvView = new OpenCvView(this);
